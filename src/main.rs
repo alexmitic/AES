@@ -1,8 +1,5 @@
-use std::io::{self, Write};
-
-// use std::io::BufRead;
-// use std::io::BufReader;
 use std::io::Read;
+use std::io::{self, Write};
 
 static S_BOX: [[u8; 16]; 16] = [
     [
@@ -60,45 +57,48 @@ static R_CON: [u8; 10] = [1, 2, 4, 8, 16, 32, 64, 128, 27, 54];
 static FIXED_MATRIX: [u8; 16] = [2, 3, 1, 1, 1, 2, 3, 1, 1, 1, 2, 3, 3, 1, 1, 2];
 
 fn main() {
-    let mut in_buff = io::stdin();
-    let mut key = [0; 16];
-    read_key(&mut in_buff, &mut key);
-    let mut key_initial: [u8; 16] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-    key_initial.copy_from_slice(&key);
+    let mut key_list: [[u8; 16]; 11] = [
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    ];
+    let mut state: [u8; 16] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 
-    let mut state = vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    let io = io::stdin();
+    let mut in_buff = io.lock();
+
+    read_key(&mut in_buff, &mut key_list[0]);
+    for i in 0..10 {
+        key_expansion(&mut key_list, i + 1);
+    }
 
     while read_state(&mut in_buff, &mut state) > 0 {
-        // print!("State in: ");
-        // print_hex(&state);
-
-        encrypt(&mut state, &mut key);
-
-        // print!("State out: ");
-        // print_hex(&state);
-        
+        encrypt(&mut state, &key_list);
         write(&state);
-
-        key.copy_from_slice(&key_initial);
     }
 }
 
-fn encrypt(mut state: &mut [u8], mut key: &mut [u8]) {
-    add_roundkey(&mut state, &key);
+fn encrypt(mut state: &mut [u8], key_list: &[[u8; 16]; 11]) {
+    add_roundkey(&mut state, &key_list[0]);
 
     for round in 0..9 {
-        key_expansion(&mut key, round);
-
-        bytes_substitution(&mut state); 
+        bytes_substitution(&mut state);
         shift_row(&mut state);
         mix_colums(&mut state);
-        add_roundkey(&mut state, &key);
-    }        
+        add_roundkey(&mut state, &key_list[round + 1]);
+    }
 
-    key_expansion(&mut key, 9);
-    bytes_substitution(&mut state); 
+    bytes_substitution(&mut state);
     shift_row(&mut state);
-    add_roundkey(&mut state, &key);
+    add_roundkey(&mut state, &key_list[10]);
 }
 
 fn add_roundkey(state: &mut [u8], key: &[u8]) {
@@ -144,144 +144,141 @@ fn mix_colums(state: &mut [u8]) {
     let mut old_state: [u8; 16] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
     old_state.copy_from_slice(state);
 
-    state[0] =  gmul(FIXED_MATRIX[0], old_state[0]) ^ 
-                gmul(FIXED_MATRIX[1], old_state[1]) ^ 
-                gmul(FIXED_MATRIX[2], old_state[2]) ^ 
-                gmul(FIXED_MATRIX[3], old_state[3]);
+    state[0] = gmul(FIXED_MATRIX[0], old_state[0])
+        ^ gmul(FIXED_MATRIX[1], old_state[1])
+        ^ gmul(FIXED_MATRIX[2], old_state[2])
+        ^ gmul(FIXED_MATRIX[3], old_state[3]);
 
-    state[4] =  gmul(FIXED_MATRIX[0], old_state[4]) ^ 
-                gmul(FIXED_MATRIX[1], old_state[5]) ^ 
-                gmul(FIXED_MATRIX[2], old_state[6]) ^ 
-                gmul(FIXED_MATRIX[3], old_state[7]);
+    state[4] = gmul(FIXED_MATRIX[0], old_state[4])
+        ^ gmul(FIXED_MATRIX[1], old_state[5])
+        ^ gmul(FIXED_MATRIX[2], old_state[6])
+        ^ gmul(FIXED_MATRIX[3], old_state[7]);
 
-    state[8] =  gmul(FIXED_MATRIX[0], old_state[8]) ^ 
-                gmul(FIXED_MATRIX[1], old_state[9]) ^ 
-                gmul(FIXED_MATRIX[2], old_state[10]) ^ 
-                gmul(FIXED_MATRIX[3], old_state[11]);
+    state[8] = gmul(FIXED_MATRIX[0], old_state[8])
+        ^ gmul(FIXED_MATRIX[1], old_state[9])
+        ^ gmul(FIXED_MATRIX[2], old_state[10])
+        ^ gmul(FIXED_MATRIX[3], old_state[11]);
 
-    state[12] = gmul(FIXED_MATRIX[0], old_state[12]) ^ 
-                gmul(FIXED_MATRIX[1], old_state[13]) ^ 
-                gmul(FIXED_MATRIX[2], old_state[14]) ^ 
-                gmul(FIXED_MATRIX[3], old_state[15]);
+    state[12] = gmul(FIXED_MATRIX[0], old_state[12])
+        ^ gmul(FIXED_MATRIX[1], old_state[13])
+        ^ gmul(FIXED_MATRIX[2], old_state[14])
+        ^ gmul(FIXED_MATRIX[3], old_state[15]);
+
+    // ************************************************
+
+    state[1] = gmul(FIXED_MATRIX[4], old_state[0])
+        ^ gmul(FIXED_MATRIX[5], old_state[1])
+        ^ gmul(FIXED_MATRIX[6], old_state[2])
+        ^ gmul(FIXED_MATRIX[7], old_state[3]);
+
+    state[5] = gmul(FIXED_MATRIX[4], old_state[4])
+        ^ gmul(FIXED_MATRIX[5], old_state[5])
+        ^ gmul(FIXED_MATRIX[6], old_state[6])
+        ^ gmul(FIXED_MATRIX[7], old_state[7]);
+
+    state[9] = gmul(FIXED_MATRIX[4], old_state[8])
+        ^ gmul(FIXED_MATRIX[5], old_state[9])
+        ^ gmul(FIXED_MATRIX[6], old_state[10])
+        ^ gmul(FIXED_MATRIX[7], old_state[11]);
+
+    state[13] = gmul(FIXED_MATRIX[4], old_state[12])
+        ^ gmul(FIXED_MATRIX[5], old_state[13])
+        ^ gmul(FIXED_MATRIX[6], old_state[14])
+        ^ gmul(FIXED_MATRIX[7], old_state[15]);
 
     // ************************************************
 
-    state[1] =  gmul(FIXED_MATRIX[4], old_state[0]) ^ 
-                gmul(FIXED_MATRIX[5], old_state[1]) ^ 
-                gmul(FIXED_MATRIX[6], old_state[2]) ^ 
-                gmul(FIXED_MATRIX[7], old_state[3]);
+    state[2] = gmul(FIXED_MATRIX[8], old_state[0])
+        ^ gmul(FIXED_MATRIX[9], old_state[1])
+        ^ gmul(FIXED_MATRIX[10], old_state[2])
+        ^ gmul(FIXED_MATRIX[11], old_state[3]);
 
-    state[5] =  gmul(FIXED_MATRIX[4], old_state[4]) ^ 
-                gmul(FIXED_MATRIX[5], old_state[5]) ^ 
-                gmul(FIXED_MATRIX[6], old_state[6]) ^ 
-                gmul(FIXED_MATRIX[7], old_state[7]);
+    state[6] = gmul(FIXED_MATRIX[8], old_state[4])
+        ^ gmul(FIXED_MATRIX[9], old_state[5])
+        ^ gmul(FIXED_MATRIX[10], old_state[6])
+        ^ gmul(FIXED_MATRIX[11], old_state[7]);
 
-    state[9] =  gmul(FIXED_MATRIX[4], old_state[8]) ^ 
-                gmul(FIXED_MATRIX[5], old_state[9]) ^ 
-                gmul(FIXED_MATRIX[6], old_state[10]) ^ 
-                gmul(FIXED_MATRIX[7], old_state[11]);
+    state[10] = gmul(FIXED_MATRIX[8], old_state[8])
+        ^ gmul(FIXED_MATRIX[9], old_state[9])
+        ^ gmul(FIXED_MATRIX[10], old_state[10])
+        ^ gmul(FIXED_MATRIX[11], old_state[11]);
 
-    state[13] = gmul(FIXED_MATRIX[4], old_state[12]) ^ 
-                gmul(FIXED_MATRIX[5], old_state[13]) ^ 
-                gmul(FIXED_MATRIX[6], old_state[14]) ^ 
-                gmul(FIXED_MATRIX[7], old_state[15]);
-
-    // ************************************************
-    
-    state[2] =  gmul(FIXED_MATRIX[8], old_state[0]) ^ 
-                gmul(FIXED_MATRIX[9], old_state[1]) ^ 
-                gmul(FIXED_MATRIX[10], old_state[2]) ^ 
-                gmul(FIXED_MATRIX[11], old_state[3]);
-
-    state[6] =  gmul(FIXED_MATRIX[8], old_state[4]) ^ 
-                gmul(FIXED_MATRIX[9], old_state[5]) ^ 
-                gmul(FIXED_MATRIX[10], old_state[6]) ^ 
-                gmul(FIXED_MATRIX[11], old_state[7]);
-
-    state[10] = gmul(FIXED_MATRIX[8], old_state[8]) ^ 
-                gmul(FIXED_MATRIX[9], old_state[9]) ^ 
-                gmul(FIXED_MATRIX[10], old_state[10]) ^ 
-                gmul(FIXED_MATRIX[11], old_state[11]);
-
-    state[14] = gmul(FIXED_MATRIX[8], old_state[12]) ^ 
-                gmul(FIXED_MATRIX[9], old_state[13]) ^ 
-                gmul(FIXED_MATRIX[10], old_state[14]) ^ 
-                gmul(FIXED_MATRIX[11], old_state[15]);
+    state[14] = gmul(FIXED_MATRIX[8], old_state[12])
+        ^ gmul(FIXED_MATRIX[9], old_state[13])
+        ^ gmul(FIXED_MATRIX[10], old_state[14])
+        ^ gmul(FIXED_MATRIX[11], old_state[15]);
 
     // ************************************************
-    
-    state[3] =  gmul(FIXED_MATRIX[12], old_state[0]) ^ 
-                gmul(FIXED_MATRIX[13], old_state[1]) ^ 
-                gmul(FIXED_MATRIX[14], old_state[2]) ^ 
-                gmul(FIXED_MATRIX[15], old_state[3]);
 
-    state[7] =  gmul(FIXED_MATRIX[12], old_state[4]) ^ 
-                gmul(FIXED_MATRIX[13], old_state[5]) ^ 
-                gmul(FIXED_MATRIX[14], old_state[6]) ^ 
-                gmul(FIXED_MATRIX[15], old_state[7]);
+    state[3] = gmul(FIXED_MATRIX[12], old_state[0])
+        ^ gmul(FIXED_MATRIX[13], old_state[1])
+        ^ gmul(FIXED_MATRIX[14], old_state[2])
+        ^ gmul(FIXED_MATRIX[15], old_state[3]);
 
-    state[11] = gmul(FIXED_MATRIX[12], old_state[8]) ^ 
-                gmul(FIXED_MATRIX[13], old_state[9]) ^ 
-                gmul(FIXED_MATRIX[14], old_state[10]) ^ 
-                gmul(FIXED_MATRIX[15], old_state[11]);
+    state[7] = gmul(FIXED_MATRIX[12], old_state[4])
+        ^ gmul(FIXED_MATRIX[13], old_state[5])
+        ^ gmul(FIXED_MATRIX[14], old_state[6])
+        ^ gmul(FIXED_MATRIX[15], old_state[7]);
 
-    state[15] = gmul(FIXED_MATRIX[12], old_state[12]) ^ 
-                gmul(FIXED_MATRIX[13], old_state[13]) ^ 
-                gmul(FIXED_MATRIX[14], old_state[14]) ^ 
-                gmul(FIXED_MATRIX[15], old_state[15]);
+    state[11] = gmul(FIXED_MATRIX[12], old_state[8])
+        ^ gmul(FIXED_MATRIX[13], old_state[9])
+        ^ gmul(FIXED_MATRIX[14], old_state[10])
+        ^ gmul(FIXED_MATRIX[15], old_state[11]);
+
+    state[15] = gmul(FIXED_MATRIX[12], old_state[12])
+        ^ gmul(FIXED_MATRIX[13], old_state[13])
+        ^ gmul(FIXED_MATRIX[14], old_state[14])
+        ^ gmul(FIXED_MATRIX[15], old_state[15]);
 }
 
-fn key_expansion(key: &mut [u8], round: usize) {
-    // Save w[3] for last XOR
-    let w30 = key[12];
-    let w31 = key[13];
-    let w32 = key[14];
-    let w33 = key[15];
-
+fn key_expansion(key_list: &mut [[u8; 16]; 11], round: usize) {
     // Circular byte left shift of w[3]
-    let tmp = key[12];
-    key[12] = key[13];
-    key[13] = key[14];
-    key[14] = key[15];
-    key[15] = tmp;
+    key_list[round][12] = key_list[round - 1][13];
+    key_list[round][13] = key_list[round - 1][14];
+    key_list[round][14] = key_list[round - 1][15];
+    key_list[round][15] = key_list[round - 1][12];
 
     // Byte Substitution (S-Box) of w[3]
-    key[12] = S_BOX[(key[12] >> 4) as usize][(key[12] & 15) as usize];
-    key[13] = S_BOX[(key[13] >> 4) as usize][(key[13] & 15) as usize];
-    key[14] = S_BOX[(key[14] >> 4) as usize][(key[14] & 15) as usize];
-    key[15] = S_BOX[(key[15] >> 4) as usize][(key[15] & 15) as usize];
+    key_list[round][12] =
+        S_BOX[(key_list[round][12] >> 4) as usize][(key_list[round][12] & 15) as usize];
+    key_list[round][13] =
+        S_BOX[(key_list[round][13] >> 4) as usize][(key_list[round][13] & 15) as usize];
+    key_list[round][14] =
+        S_BOX[(key_list[round][14] >> 4) as usize][(key_list[round][14] & 15) as usize];
+    key_list[round][15] =
+        S_BOX[(key_list[round][15] >> 4) as usize][(key_list[round][15] & 15) as usize];
 
     // Round constant
-    key[12] ^= R_CON[round];
+    key_list[round][12] ^= R_CON[round - 1];
 
     // w[4] = w[0] ⊕ g(w[3])
-    key[0] ^= key[12];
-    key[1] ^= key[13];
-    key[2] ^= key[14];
-    key[3] ^= key[15];
+    key_list[round][0] = key_list[round - 1][0] ^ key_list[round][12];
+    key_list[round][1] = key_list[round - 1][1] ^ key_list[round][13];
+    key_list[round][2] = key_list[round - 1][2] ^ key_list[round][14];
+    key_list[round][3] = key_list[round - 1][3] ^ key_list[round][15];
 
     // w[5] = w[4] ⊕ w[1]
-    key[4] ^= key[0];
-    key[5] ^= key[1];
-    key[6] ^= key[2];
-    key[7] ^= key[3];
+    key_list[round][4] = key_list[round - 1][4] ^ key_list[round][0];
+    key_list[round][5] = key_list[round - 1][5] ^ key_list[round][1];
+    key_list[round][6] = key_list[round - 1][6] ^ key_list[round][2];
+    key_list[round][7] = key_list[round - 1][7] ^ key_list[round][3];
 
     // w[6] = w[5] ⊕ w[2]
-    key[8] ^= key[4];
-    key[9] ^= key[5];
-    key[10] ^= key[6];
-    key[11] ^= key[7];
+    key_list[round][8] = key_list[round - 1][8] ^ key_list[round][4];
+    key_list[round][9] = key_list[round - 1][9] ^ key_list[round][5];
+    key_list[round][10] = key_list[round - 1][10] ^ key_list[round][6];
+    key_list[round][11] = key_list[round - 1][11] ^ key_list[round][7];
 
     // w[7] = w[6] ⊕ w[3]
-    key[12] = key[8] ^ w30;
-    key[13] = key[9] ^ w31;
-    key[14] = key[10] ^ w32;
-    key[15] = key[11] ^ w33;
+    key_list[round][12] = key_list[round][8] ^ key_list[round - 1][12];
+    key_list[round][13] = key_list[round][9] ^ key_list[round - 1][13];
+    key_list[round][14] = key_list[round][10] ^ key_list[round - 1][14];
+    key_list[round][15] = key_list[round][11] ^ key_list[round - 1][15];
 }
 
 fn gmul(mut a: u8, mut b: u8) -> u8 {
     let mut p: u8 = 0;
- 
+
     for _counter in 0..8 {
         if b & 1 != 0 {
             p ^= a;
@@ -290,23 +287,23 @@ fn gmul(mut a: u8, mut b: u8) -> u8 {
         let hi_bit_set = (a & 0x80) != 0;
         a <<= 1;
         if hi_bit_set {
-            a ^= 0x1B; 
+            a ^= 0x1B;
         }
         b >>= 1;
     }
- 
+
     return p;
 }
 
-fn read_key(in_buff: &mut std::io::Stdin, mut key: &mut [u8]) {
+fn read_key(in_buff: &mut std::io::StdinLock, mut key: &mut [u8]) {
     in_buff.read(&mut key).expect("Failed reading key");
 }
 
-fn read_state(in_buff: &mut std::io::Stdin, mut state: &mut [u8]) -> i8 {
+fn read_state(in_buff: &mut std::io::StdinLock, mut state: &mut [u8]) -> i8 {
     let e = in_buff.read_exact(&mut state);
     let e = match e {
         Ok(_) => 1,
-        Err(_) => -1
+        Err(_) => -1,
     };
 
     return e;
@@ -316,7 +313,7 @@ fn write(state: &[u8]) {
     io::stdout().write_all(state);
 }
 
-fn print_hex(bytes: &Vec<u8>) {
+fn print_hex(bytes: &[u8; 16]) {
     for x in bytes {
         print!("{:X} ", x);
     }
