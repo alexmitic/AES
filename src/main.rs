@@ -60,12 +60,15 @@ static R_CON: [u8; 10] = [1, 2, 4, 8, 16, 32, 64, 128, 27, 54];
 static FIXED_MATRIX: [u8; 16] = [2, 3, 1, 1, 1, 2, 3, 1, 1, 1, 2, 3, 3, 1, 1, 2];
 
 fn main() {
-    let mut key = read_key();
-    let key_initial = key.clone();
+    let mut in_buff = io::stdin();
+    let mut key = [0; 16];
+    read_key(&mut in_buff, &mut key);
+    let mut key_initial: [u8; 16] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    key_initial.copy_from_slice(&key);
 
     let mut state = vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 
-    while read_state(&mut state) > 0 {
+    while read_state(&mut in_buff, &mut state) > 0 {
         // print!("State in: ");
         // print_hex(&state);
 
@@ -76,11 +79,11 @@ fn main() {
         
         write(&state);
 
-        key = key_initial.clone();
+        key.copy_from_slice(&key_initial);
     }
 }
 
-fn encrypt(mut state: &mut Vec<u8>, mut key: &mut Vec<u8>) {
+fn encrypt(mut state: &mut [u8], mut key: &mut [u8]) {
     add_roundkey(&mut state, &key);
 
     for round in 0..9 {
@@ -98,19 +101,19 @@ fn encrypt(mut state: &mut Vec<u8>, mut key: &mut Vec<u8>) {
     add_roundkey(&mut state, &key);
 }
 
-fn add_roundkey(state: &mut Vec<u8>, key: &Vec<u8>) {
+fn add_roundkey(state: &mut [u8], key: &[u8]) {
     for i in 0..key.len() {
         state[i] ^= key[i];
     }
 }
 
-fn bytes_substitution(state: &mut Vec<u8>) {
+fn bytes_substitution(state: &mut [u8]) {
     for i in 0..state.len() {
         state[i] = S_BOX[(state[i] >> 4) as usize][(state[i] & 15) as usize];
     }
 }
 
-fn shift_row(state: &mut Vec<u8>) {
+fn shift_row(state: &mut [u8]) {
     let mut tmp: u8;
 
     // Second row shift offset 1
@@ -137,8 +140,9 @@ fn shift_row(state: &mut Vec<u8>) {
     state[3] = tmp;
 }
 
-fn mix_colums(state: &mut Vec<u8>) {
-    let old_state = state.clone();
+fn mix_colums(state: &mut [u8]) {
+    let mut old_state: [u8; 16] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    old_state.copy_from_slice(state);
 
     state[0] =  gmul(FIXED_MATRIX[0], old_state[0]) ^ 
                 gmul(FIXED_MATRIX[1], old_state[1]) ^ 
@@ -227,7 +231,7 @@ fn mix_colums(state: &mut Vec<u8>) {
                 gmul(FIXED_MATRIX[15], old_state[15]);
 }
 
-fn key_expansion(key: &mut Vec<u8>, round: usize) {
+fn key_expansion(key: &mut [u8], round: usize) {
     // Save w[3] for last XOR
     let w30 = key[12];
     let w31 = key[13];
@@ -294,24 +298,11 @@ fn gmul(mut a: u8, mut b: u8) -> u8 {
     return p;
 }
 
-fn read_key() -> Vec<u8> {
-    let mut in_buff = io::stdin();
-
-    let mut key = [0; 16];
+fn read_key(in_buff: &mut std::io::Stdin, mut key: &mut [u8]) {
     in_buff.read(&mut key).expect("Failed reading key");
-
-    // let mut reader = BufReader::new(in_buff);
-
-    // let mut message = vec![];
-    // let _num_bytes = reader
-    //     .read_until(b'-', &mut message)
-    //     .expect("Failed reading message");
-
-    return key.to_vec();
 }
 
-fn read_state(mut state: &mut Vec<u8>) -> i8 {
-    let mut in_buff = io::stdin();
+fn read_state(in_buff: &mut std::io::Stdin, mut state: &mut [u8]) -> i8 {
     let e = in_buff.read_exact(&mut state);
     let e = match e {
         Ok(_) => 1,
@@ -321,10 +312,7 @@ fn read_state(mut state: &mut Vec<u8>) -> i8 {
     return e;
 }
 
-fn write(state: & Vec<u8>) {
-    // for vale in state {
-    //     println!("{:?}", vale);
-    // }
+fn write(state: &[u8]) {
     io::stdout().write_all(state);
 }
 
