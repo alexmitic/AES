@@ -1,5 +1,5 @@
 use std::io::Read;
-use std::io::{self, BufReader, Write};
+use std::io::{self, BufReader, BufWriter, Write};
 
 static S_BOX: [[u8; 16]; 16] = [
     [
@@ -74,8 +74,11 @@ fn main() {
 
     let io = io::stdin();
     let in_buff = io.lock();
-
     let mut reader = BufReader::new(in_buff);
+
+    let out = io::stdout();
+    let out_buff = out.lock();
+    let mut writer = BufWriter::new(out_buff);
 
     read_bytes(&mut reader, &mut key_list[0]);
     for i in 0..10 {
@@ -84,8 +87,10 @@ fn main() {
 
     while read_bytes(&mut reader, &mut state) > 0 {
         encrypt(&mut state, &key_list);
-        write(&state);
+        write(&mut writer, &state);
     }
+
+    writer.flush();
 }
 
 fn encrypt(mut state: &mut [u8], key_list: &[[u8; 16]; 11]) {
@@ -307,8 +312,8 @@ fn read_bytes(in_buff: &mut io::BufReader<io::StdinLock>, mut state: &mut [u8]) 
     return e;
 }
 
-fn write(state: &[u8]) {
-    io::stdout().write_all(state).expect("Error while writing!");
+fn write(out_buff: &mut io::BufWriter<io::StdoutLock>,state: &[u8]) {
+    out_buff.write_all(state).expect("Error while writing!");
 }
 
 fn print_hex(bytes: &[u8; 16]) {
