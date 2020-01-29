@@ -1,5 +1,5 @@
 use std::io::Read;
-use std::io::{self, Write};
+use std::io::{self, BufReader, Write};
 
 static S_BOX: [[u8; 16]; 16] = [
     [
@@ -73,14 +73,16 @@ fn main() {
     let mut state: [u8; 16] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 
     let io = io::stdin();
-    let mut in_buff = io.lock();
+    let in_buff = io.lock();
 
-    read_key(&mut in_buff, &mut key_list[0]);
+    let mut reader = BufReader::new(in_buff);
+
+    read_bytes(&mut reader, &mut key_list[0]);
     for i in 0..10 {
         key_expansion(&mut key_list, i + 1);
     }
 
-    while read_state(&mut in_buff, &mut state) > 0 {
+    while read_bytes(&mut reader, &mut state) > 0 {
         encrypt(&mut state, &key_list);
         write(&state);
     }
@@ -295,11 +297,7 @@ fn gmul(mut a: u8, mut b: u8) -> u8 {
     return p;
 }
 
-fn read_key(in_buff: &mut std::io::StdinLock, mut key: &mut [u8]) {
-    in_buff.read(&mut key).expect("Failed reading key");
-}
-
-fn read_state(in_buff: &mut std::io::StdinLock, mut state: &mut [u8]) -> i8 {
+fn read_bytes(in_buff: &mut io::BufReader<io::StdinLock>, mut state: &mut [u8]) -> i8 {
     let e = in_buff.read_exact(&mut state);
     let e = match e {
         Ok(_) => 1,
@@ -310,7 +308,7 @@ fn read_state(in_buff: &mut std::io::StdinLock, mut state: &mut [u8]) -> i8 {
 }
 
 fn write(state: &[u8]) {
-    io::stdout().write_all(state);
+    io::stdout().write_all(state).expect("Error while writing!");
 }
 
 fn print_hex(bytes: &[u8; 16]) {
