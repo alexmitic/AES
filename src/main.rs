@@ -1,6 +1,7 @@
-use std::io;
-use std::io::BufRead;
-use std::io::BufReader;
+use std::io::{self, Write};
+
+// use std::io::BufRead;
+// use std::io::BufReader;
 use std::io::Read;
 
 static S_BOX: [[u8; 16]; 16] = [
@@ -59,27 +60,42 @@ static R_CON: [u8; 10] = [1, 2, 4, 8, 16, 32, 64, 128, 27, 54];
 static FIXED_MATRIX: [u8; 16] = [2, 3, 1, 1, 1, 2, 3, 1, 1, 1, 2, 3, 3, 1, 1, 2];
 
 fn main() {
-    let (mut key, mut state) = read_input();
+    let mut key = read_key();
+    let key_initial = key.clone();
 
-    print!("State in: ");
-    print_hex(&state);
+    let mut state = vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 
+    while read_state(&mut state) > 0 {
+        // print!("State in: ");
+        // print_hex(&state);
+
+        encrypt(&mut state, &mut key);
+
+        // print!("State out: ");
+        // print_hex(&state);
+        
+        write(&state);
+
+        key = key_initial.clone();
+    }
+}
+
+fn encrypt(mut state: &mut Vec<u8>, mut key: &mut Vec<u8>) {
     add_roundkey(&mut state, &key);
-    bytes_substitution(&mut state);
+
+    for round in 0..9 {
+        key_expansion(&mut key, round);
+
+        bytes_substitution(&mut state); 
+        shift_row(&mut state);
+        mix_colums(&mut state);
+        add_roundkey(&mut state, &key);
+    }        
+
+    key_expansion(&mut key, 9);
+    bytes_substitution(&mut state); 
     shift_row(&mut state);
-    mix_colums(&mut state);
-
-    print!("State out: ");
-    print_hex(&state);
-
-    // print!("Message in: ");
-    // print_hex(&_message);
-
-    // for round in 0..10 {
-    //     key_expansion(&mut key, round);
-    //     print!("Round {:?}: ", round);
-    //     print_hex(&key);
-    // }
+    add_roundkey(&mut state, &key);
 }
 
 fn add_roundkey(state: &mut Vec<u8>, key: &Vec<u8>) {
@@ -259,30 +275,6 @@ fn key_expansion(key: &mut Vec<u8>, round: usize) {
     key[15] = key[11] ^ w33;
 }
 
-fn read_input() -> (Vec<u8>, Vec<u8>) {
-    let mut in_buff = io::stdin();
-
-    let mut key = [0; 16];
-    in_buff.read(&mut key).expect("Failed reading key");
-
-    let mut reader = BufReader::new(in_buff);
-
-    let mut message = vec![];
-    let _num_bytes = reader
-        .read_until(b'-', &mut message)
-        .expect("Failed reading message");
-
-    return (key.to_vec(), message);
-}
-
-fn print_hex(bytes: &Vec<u8>) {
-    for x in bytes {
-        print!("{:X} ", x);
-    }
-
-    print!("\n");
-}
-
 fn gmul(mut a: u8, mut b: u8) -> u8 {
     let mut p: u8 = 0;
  
@@ -300,4 +292,46 @@ fn gmul(mut a: u8, mut b: u8) -> u8 {
     }
  
     return p;
+}
+
+fn read_key() -> Vec<u8> {
+    let mut in_buff = io::stdin();
+
+    let mut key = [0; 16];
+    in_buff.read(&mut key).expect("Failed reading key");
+
+    // let mut reader = BufReader::new(in_buff);
+
+    // let mut message = vec![];
+    // let _num_bytes = reader
+    //     .read_until(b'-', &mut message)
+    //     .expect("Failed reading message");
+
+    return key.to_vec();
+}
+
+fn read_state(mut state: &mut Vec<u8>) -> i8 {
+    let mut in_buff = io::stdin();
+    let e = in_buff.read_exact(&mut state);
+    let e = match e {
+        Ok(_) => 1,
+        Err(_) => -1
+    };
+
+    return e;
+}
+
+fn write(state: & Vec<u8>) {
+    // for vale in state {
+    //     println!("{:?}", vale);
+    // }
+    io::stdout().write_all(state);
+}
+
+fn print_hex(bytes: &Vec<u8>) {
+    for x in bytes {
+        print!("{:X} ", x);
+    }
+
+    print!("\n");
 }
