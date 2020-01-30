@@ -52,7 +52,7 @@ use std::io::{self, BufReader, BufWriter, Write};
 //     ],
 // ];
 
-const S_SUB: [u8; 256] = [
+static S_SUB: [u8; 256] = [
     99, 124, 119, 123, 242, 107, 111, 197, 48, 1, 103, 43, 254, 215, 171, 118, 202, 130, 201, 125,
     250, 89, 71, 240, 173, 212, 162, 175, 156, 164, 114, 192, 183, 253, 147, 38, 54, 63, 247, 204,
     52, 165, 229, 241, 113, 216, 49, 21, 4, 199, 35, 195, 24, 150, 5, 154, 7, 18, 128, 226, 235,
@@ -68,11 +68,11 @@ const S_SUB: [u8; 256] = [
     153, 45, 15, 176, 84, 187, 22,
 ];
 
-const R_CON: [u8; 10] = [1, 2, 4, 8, 16, 32, 64, 128, 27, 54];
+static R_CON: [u8; 10] = [1, 2, 4, 8, 16, 32, 64, 128, 27, 54];
 
-const FIXED_MATRIX: [u8; 16] = [2, 3, 1, 1, 1, 2, 3, 1, 1, 1, 2, 3, 3, 1, 1, 2];
+static FIXED_MATRIX: [u8; 16] = [2, 3, 1, 1, 1, 2, 3, 1, 1, 1, 2, 3, 3, 1, 1, 2];
 
-const G_MUL: [[u8; 256]; 3] = [
+static G_MUL: [[u8; 256]; 3] = [
     [
         0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
         25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47,
@@ -144,7 +144,7 @@ fn main() {
     let out_buff = out.lock();
     let mut writer = BufWriter::new(out_buff);
 
-    if let Ok(_) = reader.read_exact(&mut key_list[0]) {};
+    reader.read_exact(&mut key_list[0]).is_ok();
 
     for i in 0..10 {
         key_expansion(&mut key_list, i + 1);
@@ -152,7 +152,7 @@ fn main() {
 
     while let Ok(_) = reader.read_exact(&mut state) {
         encrypt(&mut state, &key_list);
-        writer.write_all(&mut state).expect("Error while writing!");
+        writer.write_all(&state).expect("Error while writing!");
     }
 
     writer.flush();
